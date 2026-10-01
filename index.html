@@ -1,1 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>南山生 座席予約システム</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- QRコード作成用ライブラリ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>南山生 座席予約システム</h1>
+    
+    <!-- モード切替タブ -->
+    <div class="tab-menu">
+      <button class="tab-btn active" onclick="switchTab('reserve')">新規座席予約</button>
+      <button class="tab-btn" onclick="switchTab('cancel')">予約の確認・キャンセル</button>
+    </div>
 
+    <!-- 1. 新規予約フォーム -->
+    <div id="reserveSection" class="section">
+      <form id="reservationForm" onsubmit="handleReserve(event)">
+        <div class="form-group row">
+          <div>
+            <label>姓 *</label>
+            <input type="text" id="lastName" placeholder="南山" required>
+          </div>
+          <div>
+            <label>名 *</label>
+            <input type="text" id="firstName" placeholder="太郎" required>
+          </div>
+        </div>
+
+        <div class="form-group row">
+          <div>
+            <label>せい（ふりがな） *</label>
+            <input type="text" id="lastKana" placeholder="なんざん" pattern="^[ぁ-ん]+$" title="ひらがなで入力してください" required>
+          </div>
+          <div>
+            <label>めい（ふりがな） *</label>
+            <input type="text" id="firstKana" placeholder="たろう" pattern="^[ぁ-ん]+$" title="ひらがなで入力してください" required>
+          </div>
+        </div>
+
+        <div class="form-group row">
+          <div>
+            <label>学年 *</label>
+            <select id="grade" required>
+              <option value="">選択してください</option>
+              <option value="J1">J1</option>
+              <option value="J2">J2</option>
+              <option value="J3">J3</option>
+              <option value="S1">S1</option>
+              <option value="S2">S2</option>
+              <option value="S3">S3</option>
+            </select>
+          </div>
+          <div>
+            <label>クラス *</label>
+            <select id="className" required>
+              <option value="">選択</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+              <option value="E">E</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>7桁の学籍番号 *</label>
+          <input type="text" id="studentId" placeholder="例: 2024001 (2021〜2026年度 + 001〜220)" maxlength="7" required>
+          <small class="hint">※2021〜2026年入学生（001〜220）のみ入力可能</small>
+        </div>
+
+        <div class="form-group">
+          <label>生年月日 *</label>
+          <input type="date" id="birthdate" required>
+        </div>
+
+        <!-- シートマップ -->
+        <div class="form-group">
+          <label>座席を選択してください (10列 × 3行 / 2人掛け5ブロック) *</label>
+          <div class="screen-label">ステージ / 前方</div>
+          <div id="seatMap" class="seat-map"></div>
+          <input type="hidden" id="selectedSeat" required>
+          <p id="seatSelectionStatus" class="seat-status-text">座席を選択してください</p>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">予約内容を確認して確定</button>
+      </form>
+    </div>
+
+    <!-- 2. 入場券表示画面（予約確定後） -->
+    <div id="ticketSection" class="section hidden">
+      <div class="ticket-box" id="printableTicket">
+        <h2>講演会 入場券</h2>
+        <div id="qrcode" class="qr-container"></div>
+        <p class="ticket-id">予約番号: <span id="ticketResId"></span></p>
+        
+        <div class="ticket-details">
+          <p><strong>氏名:</strong> <span id="ticketName"></span> 様</p>
+          <p><strong>所属:</strong> <span id="ticketClass"></span></p>
+          <p><strong>座席番号:</strong> <span id="ticketSeat" class="seat-highlight"></span></p>
+        </div>
+
+        <p class="ticket-notice">
+          ※入場にはQRコードをタブレット等の端末での呈示が必要です。<br>
+          プリントアウトしたQRコードで入場することもできます。
+        </p>
+      </div>
+
+      <div class="action-buttons">
+        <button onclick="window.print()" class="print-btn">🖨️ 入場券を印刷 / PDF保存</button>
+        <button onclick="location.reload()" class="secondary-btn">トップに戻る</button>
+      </div>
+    </div>
+
+    <!-- 3. キャンセルフォーム -->
+    <div id="cancelSection" class="section hidden">
+      <h3>予約のキャンセル・照会</h3>
+      <p class="notice-text">※座席を変更したい場合は、一度既存の予約をキャンセルしてから再度ご予約ください。</p>
+      
+      <form onsubmit="handleCancel(event)">
+        <div class="form-group row">
+          <div>
+            <label>せい（ふりがな） *</label>
+            <input type="text" id="cancelLastKana" placeholder="なんざん" required>
+          </div>
+          <div>
+            <label>めい（ふりがな） *</label>
+            <input type="text" id="cancelFirstKana" placeholder="たろう" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>7桁の学籍番号 *</label>
+          <input type="text" id="cancelStudentId" maxlength="7" required>
+        </div>
+
+        <div class="form-group">
+          <label>生年月日 *</label>
+          <input type="date" id="cancelBirthdate" required>
+        </div>
+
+        <button type="submit" class="danger-btn" id="cancelBtn">予約を照会してキャンセル</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // ★ご自身のGAS WebアプリURLに差し替えてください★
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxpf73U1yPf3frEY7E6NXVJoDPqou0GVhUC2YU19fDC8Wve9jB2jFfyh3D_2MBSt5PsnA/exec";
+
+    let reservedSeats = [];
+
+    // 初期化：既存の予約済み座席を取得しシートマップを描画
+    window.onload = async () => {
+      await fetchReservedSeats();
+      renderSeatMap();
+    };
+
+    // タブ切り替え
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(sec => sec.classList.add('hidden'));
+
+      if (tab === 'reserve') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('reserveSection').classList.remove('hidden');
+      } else {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('cancelSection').classList.remove('hidden');
+      }
+    }
+
+    // 予約済みの座席を取得
+    async function fetchReservedSeats() {
+      try {
+        const res = await fetch(GAS_API_URL);
+        const data = await res.json();
+        reservedSeats = data
+          .filter(item => item['ステータス'] !== 'キャンセル')
+          .map(item => item['座席番号']);
+      } catch (err) {
+        console.error("座席データの取得に失敗しました", err);
+      }
+    }
+
+    // シートマップの生成 (10列 × 3行、2人掛けペア5ブロック)
+    function renderSeatMap() {
+      const seatMap = document.getElementById('seatMap');
+      seatMap.innerHTML = '';
+
+      const rows = ['A', 'B', 'C'];
+      rows.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'seat-row';
+
+        for (let col = 1; col <= 10; col++) {
+          const seatId = `${row}-${col}`;
+          const seatBtn = document.createElement('button');
+          seatBtn.type = 'button';
+          seatBtn.className = 'seat-btn';
+          seatBtn.innerText = seatId;
+
+          // 2人掛け×5ペアの通路スペースを設定
+          if (col % 2 === 0 && col !== 10) {
+            seatBtn.classList.add('aisle-right');
+          }
+
+          if (reservedSeats.includes(seatId)) {
+            seatBtn.classList.add('occupied');
+            seatBtn.disabled = true;
+          } else {
+            seatBtn.onclick = () => selectSeat(seatId, seatBtn);
+          }
+
+          rowDiv.appendChild(seatBtn);
+        }
+        seatMap.appendChild(rowDiv);
+      });
+    }
+
+    // 座席選択処理
+    function selectSeat(seatId, btn) {
+      document.querySelectorAll('.seat-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      document.getElementById('selectedSeat').value = seatId;
+      document.getElementById('seatSelectionStatus').innerText = `選択中の座席: ${seatId}`;
+    }
+
+    // 学籍番号のバリデーションチェック (2021〜2026 + 001〜220)
+    function validateStudentId(id) {
+      if (!/^\d{7}$/.test(id)) return false;
+      const year = parseInt(id.substring(0, 4), 10);
+      const num = parseInt(id.substring(4, 7), 10);
+      return (year >= 2021 && year <= 2026) && (num >= 1 && num <= 220);
+    }
+
+    // 予約実行処理
+    async function handleReserve(e) {
+      e.preventDefault();
+      
+      const studentId = document.getElementById('studentId').value;
+      const seat = document.getElementById('selectedSeat').value;
+
+      if (!validateStudentId(studentId)) {
+        alert("学籍番号が正しくありません。\n入学年度(2021〜2026) + 通し番号(001〜220)の7桁で入力してください。");
+        return;
+      }
+
+      if (!seat) {
+        alert("座席を選択してください。");
+        return;
+      }
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerText = "予約処理中...";
+
+      const payload = {
+        action: "reserve",
+        lastName: document.getElementById('lastName').value,
+        firstName: document.getElementById('firstName').value,
+        lastKana: document.getElementById('lastKana').value,
+        firstKana: document.getElementById('firstKana').value,
+        grade: document.getElementById('grade').value,
+        className: document.getElementById('className').value,
+        studentId: studentId,
+        birthdate: document.getElementById('birthdate').value,
+        seat: seat
+      };
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          showTicket(result.reservationId, payload);
+        } else {
+          alert("エラー: " + result.message);
+          submitBtn.disabled = false;
+          submitBtn.innerText = "予約内容を確認して確定";
+        }
+      } catch (err) {
+        alert("通信エラーが発生しました。時間をおいて再試行してください。");
+        submitBtn.disabled = false;
+        submitBtn.innerText = "予約内容を確認して確定";
+      }
+    }
+
+    // 入場券（QRコード）表示
+    function showTicket(resId, data) {
+      document.getElementById('reserveSection').classList.add('hidden');
+      document.querySelector('.tab-menu').classList.add('hidden');
+      document.getElementById('ticketSection').classList.remove('hidden');
+
+      document.getElementById('ticketResId').innerText = resId;
+      document.getElementById('ticketName').innerText = `${data.lastName} ${data.firstName}`;
+      document.getElementById('ticketClass').innerText = `${data.grade}年 ${data.className}組 (${data.studentId})`;
+      document.getElementById('ticketSeat').innerText = data.seat;
+
+      // QRコードの生成
+      document.getElementById('qrcode').innerHTML = '';
+      new QRCode(document.getElementById('qrcode'), {
+        text: resId,
+        width: 180,
+        height: 180
+      });
+    }
+
+    // キャンセル実行処理
+    async function handleCancel(e) {
+      e.preventDefault();
+      
+      const payload = {
+        action: "cancel",
+        lastKana: document.getElementById('cancelLastKana').value,
+        firstKana: document.getElementById('cancelFirstKana').value,
+        studentId: document.getElementById('cancelStudentId').value,
+        birthdate: document.getElementById('cancelBirthdate').value
+      };
+
+      if (!confirm("入力された内容で予約をキャンセルします。よろしいですか？")) return;
+
+      const cancelBtn = document.getElementById('cancelBtn');
+      cancelBtn.disabled = true;
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          alert("予約のキャンセルが完了しました。");
+          location.reload();
+        } else {
+          alert("エラー: " + result.message);
+          cancelBtn.disabled = false;
+        }
+      } catch (err) {
+        alert("通信エラーが発生しました。");
+        cancelBtn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
