@@ -1,1 +1,211 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
 
+body {
+  background-color: #f4f7f9;
+  color: #333;
+  line-height: 1.6;
+  padding: 20px 10px;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+h1 {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #1e3c72;
+  margin-bottom: 20px;
+}
+
+/* タブ */
+.tab-menu {
+  display: flex;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: none;
+  font-size: 0.95rem;
+  font-weight: bold;
+  color: #777;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  color: #1e3c72;
+  border-bottom: 3px solid #1e3c72;
+}
+
+.hidden { display: none !important; }
+
+/* フォーム */
+.form-group { margin-bottom: 15px; }
+.form-group.row { display: flex; gap: 10px; }
+.form-group.row > div { flex: 1; }
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+input[type="text"], input[type="date"], select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.hint { font-size: 0.75rem; color: #666; }
+
+/* ボタン */
+button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.submit-btn { background: #1e3c72; color: #fff; }
+.submit-btn:hover { background: #162b52; }
+.danger-btn { background: #e74c3c; color: #fff; }
+.print-btn { background: #27ae60; color: #fff; margin-bottom: 10px; }
+.secondary-btn { background: #95a5a6; color: #fff; }
+
+/* シートマップ */
+.screen-label {
+  text-align: center;
+  background: #ddd;
+  padding: 4px;
+  font-size: 0.8rem;
+  margin-bottom: 12px;
+  border-radius: 4px;
+}
+
+.seat-map {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+
+.seat-row {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.seat-btn, .admin-seat-box {
+  width: 32px;
+  height: 32px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.seat-btn {
+  border: 1px solid #2980b9;
+  background: #eaf2f8;
+  color: #2980b9;
+}
+
+.seat-btn.selected { background: #f39c12; color: #fff; border-color: #d35400; }
+.seat-btn.occupied { background: #bdc3c7; color: #7f8c8d; border-color: #bdc3c7; }
+.aisle-right { margin-right: 12px; }
+
+.seat-status-text {
+  text-align: center;
+  font-weight: bold;
+  margin-top: 8px;
+  color: #e67e22;
+}
+
+/* 入場券 */
+.ticket-box {
+  border: 2px dashed #1e3c72;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  background: #fcfcfc;
+}
+
+.qr-container { display: flex; justify-content: center; margin: 15px 0; }
+.seat-highlight { font-size: 1.4rem; color: #e74c3c; }
+.ticket-notice { font-size: 0.8rem; color: #555; margin-top: 15px; }
+
+/* 運営用レイアウト */
+.admin-body { background: #1a1e24; color: #e0e0e0; max-width: 100%; }
+.admin-container { max-width: 1400px; margin: 0 auto; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.admin-header h1 { color: #fff; margin: 0; }
+.refresh-btn { width: auto; background: #3498db; color: #fff; padding: 8px 16px; }
+
+.admin-grid { display: grid; grid-template-columns: 400px 1fr; gap: 20px; }
+@media (max-width: 900px) { .admin-grid { grid-template-columns: 1fr; } }
+
+.admin-card { background: #242b35; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+.admin-card h2 { font-size: 1.1rem; margin-bottom: 15px; color: #fff; border-bottom: 1px solid #3a4454; padding-bottom: 8px; }
+
+.scan-result-box { margin-top: 15px; padding: 15px; border-radius: 6px; text-align: center; }
+.scan-result-box.success { background: #27ae60; color: #fff; }
+.scan-result-box.error { background: #c0392b; color: #fff; }
+
+/* 管理者シートマップ */
+.admin-seat-box { font-size: 0.65rem; color: #fff; }
+.admin-seat-box.free { background: #34495e; }
+.admin-seat-box.reserved { background: #e67e22; }
+.admin-seat-box.checked { background: #27ae60; }
+
+.legend { display: flex; gap: 15px; margin-bottom: 10px; font-size: 0.8rem; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-item .box { width: 12px; height: 12px; border-radius: 2px; }
+
+/* テーブル */
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.search-box { width: 250px; padding: 6px 12px; }
+.table-wrapper { overflow-x: auto; max-height: 600px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.data-table th, .data-table td { padding: 10px; text-align: left; border-bottom: 1px solid #3a4454; }
+.data-table th { background: #1a1e24; color: #aaa; position: sticky; top: 0; }
+
+.badge { padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+.badge-reserved { background: #e67e22; color: #fff; }
+.badge-checked { background: #27ae60; color: #fff; }
+.badge-cancelled { background: #7f8c8d; color: #fff; }
+
+.btn-sm { padding: 4px 8px; font-size: 0.75rem; width: auto; margin-right: 4px; }
+.btn-check { background: #27ae60; color: #fff; }
+.btn-cancel { background: #c0392b; color: #fff; }
+
+/* 印刷用スタイル */
+@media print {
+  body * { visibility: hidden; }
+  #printableTicket, #printableTicket * { visibility: visible; }
+  #printableTicket { position: absolute; left: 0; top: 0; width: 100%; border: none; }
+  .action-buttons, .tab-menu, h1 { display: none !important; }
+}
