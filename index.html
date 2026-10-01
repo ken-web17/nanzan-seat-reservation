@@ -7,6 +7,22 @@
   <link rel="stylesheet" href="style.css">
   <!-- QRコード作成用ライブラリ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    /* 追加のレイアウト微調整 */
+    .hidden { display: none !important; }
+    .seat-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+    .seat-btn { width: 42px; height: 42px; font-weight: bold; border-radius: 4px; border: 1px solid #ccc; background: #f8f9fa; cursor: pointer; }
+    .seat-btn.aisle-right { margin-right: 18px; }
+    .seat-btn.selected { background: #0d6efd; color: white; border-color: #0d6efd; }
+    .seat-btn.occupied { background: #dc3545; color: white; border-color: #dc3545; cursor: not-allowed; opacity: 0.7; }
+    .screen-label { text-align: center; background: #e9ecef; padding: 6px; border-radius: 4px; margin-bottom: 12px; font-weight: bold; }
+    .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; }
+    .tab-btn { flex: 1; padding: 10px; border: 1px solid #ccc; background: #e9ecef; cursor: pointer; font-weight: bold; }
+    .tab-btn.active { background: #0d6efd; color: white; border-color: #0d6efd; }
+    .ticket-box { border: 2px dashed #0d6efd; padding: 20px; text-align: center; border-radius: 8px; background: #f8f9fa; }
+    .qr-container { display: flex; justify-content: center; margin: 15px 0; }
+    .seat-highlight { font-size: 1.4em; font-weight: bold; color: #0d6efd; }
+  </style>
 </head>
 <body>
   <div class="container">
@@ -151,8 +167,16 @@
   </div>
 
   <script>
-    // ★ご自身のGAS WebアプリURLに差し替えてください★
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxpf73U1yPf3frEY7E6NXVJoDPqou0GVhUC2YU19fDC8Wve9jB2jFfyh3D_2MBSt5PsnA/exec";
+    // GitHub構成設定
+    const GITHUB_OWNER = "ken-web17";
+    const GITHUB_REPO = "nanzan-seat-reservation";
+    const GITHUB_BRANCH = "main";
+    const FILE_PATH = "data.json";
+    
+    // ⚠️ 発行した Personal Access Token (ghp_...) をここに貼り付けてください
+    const GITHUB_TOKEN = "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";
+
+    const API_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`;
 
     let reservedSeats = [];
 
@@ -176,14 +200,21 @@
       }
     }
 
-    // 予約済みの座席を取得
+    // GitHubから予約データを取得 (GET)
+    async function fetchDatabase() {
+      const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${FILE_PATH}?t=${Date.now()}`;
+      const res = await fetch(rawUrl);
+      if (!res.ok) throw new Error("データの取得に失敗しました");
+      return await res.json();
+    }
+
+    // 予約済みの座席一覧を取得して反映
     async function fetchReservedSeats() {
       try {
-        const res = await fetch(GAS_API_URL);
-        const data = await res.json();
+        const data = await fetchDatabase();
         reservedSeats = data
-          .filter(item => item['ステータス'] !== 'キャンセル')
-          .map(item => item['座席番号']);
+          .filter(item => item.status !== 'cancelled')
+          .map(item => item.seat);
       } catch (err) {
         console.error("座席データの取得に失敗しました", err);
       }
@@ -206,7 +237,6 @@
           seatBtn.className = 'seat-btn';
           seatBtn.innerText = seatId;
 
-          // 2人掛け×5ペアの通路スペースを設定
           if (col % 2 === 0 && col !== 10) {
             seatBtn.classList.add('aisle-right');
           }
@@ -240,6 +270,49 @@
       return (year >= 2021 && year <= 2026) && (num >= 1 && num <= 220);
     }
 
+    // UTF-8対応 Base64エンコード/デコード
+    function utf8_to_b64(str) {
+      return window.btoa(unescape(encodeURIComponent(str)));
+    }
+    function b64_to_utf8(str) {
+      return decodeURIComponent(escape(window.atob(str)));
+    }
+
+    // GitHub上の data.json を更新する (PUT)
+    async function updateGitHubData(updateCallback, commitMessage) {
+      // 1. 最新のファイル情報 (sha含む) を取得
+      const getRes = await fetch(API_URL, {
+        headers: { "Authorization": `token ${GITHUB_TOKEN}` }
+      });
+      if (!getRes.ok) throw new Error("GitHubからのデータ読み込みに失敗しました");
+      
+      const fileMetaData = await getRes.json();
+      const currentContent = JSON.parse(b64_to_utf8(fileMetaData.content.replace(/\n/g, '')));
+
+      // 2. コールバック処理でデータを更新
+      const updatedContent = updateCallback(currentContent);
+
+      // 3. UTF-8でBase64エンコードして更新リクエストを送信
+      const encodedContent = utf8_to_b64(JSON.stringify(updatedContent, null, 2));
+
+      const putRes = await fetch(API_URL, {
+        method: "PUT",
+        headers: {
+          "Authorization": `token ${GITHUB_TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: commitMessage,
+          content: encodedContent,
+          sha: fileMetaData.sha,
+          branch: GITHUB_BRANCH
+        })
+      });
+
+      if (!putRes.ok) throw new Error("GitHubへのデータ保存に失敗しました");
+      return await putRes.json();
+    }
+
     // 予約実行処理
     async function handleReserve(e) {
       e.preventDefault();
@@ -261,8 +334,9 @@
       submitBtn.disabled = true;
       submitBtn.innerText = "予約処理中...";
 
+      const reservationId = "RES-" + Date.now();
       const payload = {
-        action: "reserve",
+        reservationId: reservationId,
         lastName: document.getElementById('lastName').value,
         firstName: document.getElementById('firstName').value,
         lastKana: document.getElementById('lastKana').value,
@@ -271,25 +345,23 @@
         className: document.getElementById('className').value,
         studentId: studentId,
         birthdate: document.getElementById('birthdate').value,
-        seat: seat
+        seat: seat,
+        status: "reserved",
+        createdAt: new Date().toISOString()
       };
 
       try {
-        const res = await fetch(GAS_API_URL, {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
+        await updateGitHubData((db) => {
+          // 重複チェック
+          const isAlreadyTaken = db.some(item => item.seat === seat && item.status !== 'cancelled');
+          if (isAlreadyTaken) throw new Error("指定された座席は既に予約されています。");
+          db.push(payload);
+          return db;
+        }, `予約追加: ${seat} (${studentId})`);
 
-        if (result.success) {
-          showTicket(result.reservationId, payload);
-        } else {
-          alert("エラー: " + result.message);
-          submitBtn.disabled = false;
-          submitBtn.innerText = "予約内容を確認して確定";
-        }
+        showTicket(reservationId, payload);
       } catch (err) {
-        alert("通信エラーが発生しました。時間をおいて再試行してください。");
+        alert("エラー: " + err.message);
         submitBtn.disabled = false;
         submitBtn.innerText = "予約内容を確認して確定";
       }
@@ -319,13 +391,10 @@
     async function handleCancel(e) {
       e.preventDefault();
       
-      const payload = {
-        action: "cancel",
-        lastKana: document.getElementById('cancelLastKana').value,
-        firstKana: document.getElementById('cancelFirstKana').value,
-        studentId: document.getElementById('cancelStudentId').value,
-        birthdate: document.getElementById('cancelBirthdate').value
-      };
+      const lastKana = document.getElementById('cancelLastKana').value;
+      const firstKana = document.getElementById('cancelFirstKana').value;
+      const studentId = document.getElementById('cancelStudentId').value;
+      const birthdate = document.getElementById('cancelBirthdate').value;
 
       if (!confirm("入力された内容で予約をキャンセルします。よろしいですか？")) return;
 
@@ -333,21 +402,32 @@
       cancelBtn.disabled = true;
 
       try {
-        const res = await fetch(GAS_API_URL, {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
+        let found = false;
+        await updateGitHubData((db) => {
+          const target = db.find(item => 
+            item.lastKana === lastKana &&
+            item.firstKana === firstKana &&
+            item.studentId === studentId &&
+            item.birthdate === birthdate &&
+            item.status !== 'cancelled'
+          );
 
-        if (result.success) {
+          if (!target) {
+            throw new Error("該当する予約情報が見つかりませんでした。入力内容をご確認ください。");
+          }
+
+          target.status = 'cancelled';
+          target.cancelledAt = new Date().toISOString();
+          found = true;
+          return db;
+        }, `予約キャンセル: ${studentId}`);
+
+        if (found) {
           alert("予約のキャンセルが完了しました。");
           location.reload();
-        } else {
-          alert("エラー: " + result.message);
-          cancelBtn.disabled = false;
         }
       } catch (err) {
-        alert("通信エラーが発生しました。");
+        alert("エラー: " + err.message);
         cancelBtn.disabled = false;
       }
     }
