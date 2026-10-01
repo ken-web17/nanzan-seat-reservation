@@ -3,330 +3,176 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>南山生 座席予約システム</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- QRコード作成用ライブラリ -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <title>南山座席予約システム</title>
   <style>
-    /* 追加のレイアウト微調整 */
-    .hidden { display: none !important; }
-    .seat-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
-    .seat-btn { width: 42px; height: 42px; font-weight: bold; border-radius: 4px; border: 1px solid #ccc; background: #f8f9fa; cursor: pointer; }
-    .seat-btn.aisle-right { margin-right: 18px; }
-    .seat-btn.selected { background: #0d6efd; color: white; border-color: #0d6efd; }
-    .seat-btn.occupied { background: #dc3545; color: white; border-color: #dc3545; cursor: not-allowed; opacity: 0.7; }
-    .screen-label { text-align: center; background: #e9ecef; padding: 6px; border-radius: 4px; margin-bottom: 12px; font-weight: bold; }
-    .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; }
-    .tab-btn { flex: 1; padding: 10px; border: 1px solid #ccc; background: #e9ecef; cursor: pointer; font-weight: bold; }
-    .tab-btn.active { background: #0d6efd; color: white; border-color: #0d6efd; }
-    .ticket-box { border: 2px dashed #0d6efd; padding: 20px; text-align: center; border-radius: 8px; background: #f8f9fa; }
-    .qr-container { display: flex; justify-content: center; margin: 15px 0; }
-    .seat-highlight { font-size: 1.4em; font-weight: bold; color: #0d6efd; }
+    body { font-family: sans-serif; padding: 20px; background-color: #f4f6f9; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    h1 { text-align: center; color: #333; }
+    .seat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; }
+    .seat { padding: 15px; border: 1px solid #ccc; text-align: center; border-radius: 5px; cursor: pointer; background-color: #e9ecef; }
+    .seat.selected { background-color: #0d6efd; color: white; }
+    .seat.reserved { background-color: #dc3545; color: white; cursor: not-allowed; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    button { width: 100%; padding: 10px; background-color: #198754; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+    button:disabled { background-color: #6c757d; cursor: not-allowed; }
   </style>
 </head>
 <body>
+
   <div class="container">
-    <h1>南山生 座席予約システム</h1>
+    <h1>座席予約システム</h1>
     
-    <!-- モード切替タブ -->
-    <div class="tab-menu">
-      <button class="tab-btn active" onclick="switchTab('reserve')">新規座席予約</button>
-      <button class="tab-btn" onclick="switchTab('cancel')">予約の確認・キャンセル</button>
+    <h3>1. 座席を選択してください</h3>
+    <div class="seat-grid" id="seatGrid">
+      <!-- JavaScriptで座席を自動生成 -->
     </div>
 
-    <!-- 1. 新規予約フォーム -->
-    <div id="reserveSection" class="section">
-      <form id="reservationForm" onsubmit="handleReserve(event)">
-        <div class="form-group row">
-          <div>
-            <label>姓 *</label>
-            <input type="text" id="lastName" placeholder="南山" required>
-          </div>
-          <div>
-            <label>名 *</label>
-            <input type="text" id="firstName" placeholder="太郎" required>
-          </div>
-        </div>
-
-        <div class="form-group row">
-          <div>
-            <label>せい（ふりがな） *</label>
-            <input type="text" id="lastKana" placeholder="なんざん" pattern="^[ぁ-ん]+$" title="ひらがなで入力してください" required>
-          </div>
-          <div>
-            <label>めい（ふりがな） *</label>
-            <input type="text" id="firstKana" placeholder="たろう" pattern="^[ぁ-ん]+$" title="ひらがなで入力してください" required>
-          </div>
-        </div>
-
-        <div class="form-group row">
-          <div>
-            <label>学年 *</label>
-            <select id="grade" required>
-              <option value="">選択してください</option>
-              <option value="J1">J1</option>
-              <option value="J2">J2</option>
-              <option value="J3">J3</option>
-              <option value="S1">S1</option>
-              <option value="S2">S2</option>
-              <option value="S3">S3</option>
-            </select>
-          </div>
-          <div>
-            <label>クラス *</label>
-            <select id="className" required>
-              <option value="">選択</option>
-              <option value="A">A</option>
-              <option value="B">B</option>
-              <option value="C">C</option>
-              <option value="D">D</option>
-              <option value="E">E</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>7桁の学籍番号 *</label>
-          <input type="text" id="studentId" placeholder="例: 2024001 (2021〜2026年度 + 001〜220)" maxlength="7" required>
-          <small class="hint">※2021〜2026年入学生（001〜220）のみ入力可能</small>
-        </div>
-
-        <div class="form-group">
-          <label>生年月日 *</label>
-          <input type="date" id="birthdate" required>
-        </div>
-
-        <!-- シートマップ -->
-        <div class="form-group">
-          <label>座席を選択してください (10列 × 3行 / 2人掛け5ブロック) *</label>
-          <div class="screen-label">ステージ / 前方</div>
-          <div id="seatMap" class="seat-map"></div>
-          <input type="hidden" id="selectedSeat" required>
-          <p id="seatSelectionStatus" class="seat-status-text">座席を選択してください</p>
-        </div>
-
-        <button type="submit" class="submit-btn" id="submitBtn">予約内容を確認して確定</button>
-      </form>
-    </div>
-
-    <!-- 2. 入場券表示画面（予約確定後） -->
-    <div id="ticketSection" class="section hidden">
-      <div class="ticket-box" id="printableTicket">
-        <h2>講演会 入場券</h2>
-        <div id="qrcode" class="qr-container"></div>
-        <p class="ticket-id">予約番号: <span id="ticketResId"></span></p>
-        
-        <div class="ticket-details">
-          <p><strong>氏名:</strong> <span id="ticketName"></span> 様</p>
-          <p><strong>所属:</strong> <span id="ticketClass"></span></p>
-          <p><strong>座席番号:</strong> <span id="ticketSeat" class="seat-highlight"></span></p>
-        </div>
-
-        <p class="ticket-notice">
-          ※入場にはQRコードをタブレット等の端末での呈示が必要です。<br>
-          プリントアウトしたQRコードで入場することもできます。
-        </p>
+    <h3>2. 予約者情報を入力してください</h3>
+    <form id="reservationForm">
+      <div class="form-group">
+        <label>選択した座席:</label>
+        <input type="text" id="selectedSeat" readonly placeholder="座席を選択してください">
+      </div>
+      <div class="form-group">
+        <label>姓:</label>
+        <input type="text" id="lastName" required placeholder="例: 南山">
+      </div>
+      <div class="form-group">
+        <label>名:</label>
+        <input type="text" id="firstName" required placeholder="例: 太郎">
+      </div>
+      <div class="form-group">
+        <label>セイ（フリガナ）:</label>
+        <input type="text" id="lastKana" required placeholder="例: ナンザン">
+      </div>
+      <div class="form-group">
+        <label>メイ（フリガナ）:</label>
+        <input type="text" id="firstKana" required placeholder="例: タロウ">
+      </div>
+      <div class="form-group">
+        <label>学年・クラス:</label>
+        <input type="text" id="gradeClass" required placeholder="例: 2年A組">
+      </div>
+      <div class="form-group">
+        <label>学籍番号:</label>
+        <input type="text" id="studentId" required placeholder="例: 20240001">
+      </div>
+      <div class="form-group">
+        <label>生年月日:</label>
+        <input type="date" id="birthdate" required>
       </div>
 
-      <div class="action-buttons">
-        <button onclick="window.print()" class="print-btn">🖨️ 入場券を印刷 / PDF保存</button>
-        <button onclick="location.reload()" class="secondary-btn">トップに戻る</button>
-      </div>
-    </div>
-
-    <!-- 3. キャンセルフォーム -->
-    <div id="cancelSection" class="section hidden">
-      <h3>予約のキャンセル・照会</h3>
-      <p class="notice-text">※座席を変更したい場合は、一度既存の予約をキャンセルしてから再度ご予約ください。</p>
-      
-      <form onsubmit="handleCancel(event)">
-        <div class="form-group row">
-          <div>
-            <label>せい（ふりがな） *</label>
-            <input type="text" id="cancelLastKana" placeholder="なんざん" required>
-          </div>
-          <div>
-            <label>めい（ふりがな） *</label>
-            <input type="text" id="cancelFirstKana" placeholder="たろう" required>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>7桁の学籍番号 *</label>
-          <input type="text" id="cancelStudentId" maxlength="7" required>
-        </div>
-
-        <div class="form-group">
-          <label>生年月日 *</label>
-          <input type="date" id="cancelBirthdate" required>
-        </div>
-
-        <button type="submit" class="danger-btn" id="cancelBtn">予約を照会してキャンセル</button>
-      </form>
-    </div>
+      <button type="button" id="submitBtn" onclick="submitReservation()">予約を確定する</button>
+    </form>
   </div>
 
   <script>
-    // GitHub構成設定
+    // ==========================================
+    //  GitHub 構成設定
+    // ==========================================
     const GITHUB_OWNER = "ken-web17";
     const GITHUB_REPO = "nanzan-seat-reservation";
     const GITHUB_BRANCH = "main";
     const FILE_PATH = "data.json";
-    
+
     // ⚠️ 発行した Personal Access Token (ghp_...) をここに貼り付けてください
     const GITHUB_TOKEN = "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";
 
     const API_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`;
 
-    let reservedSeats = [];
+    let reservedData = [];
+    let currentSelectedSeat = null;
 
-    // 初期化：既存の予約済み座席を取得しシートマップを描画
+    // 初期化：座席一覧の生成とデータ読み込み
     window.onload = async () => {
-      await fetchReservedSeats();
-      renderSeatMap();
+      renderSeats();
+      await loadReservations();
     };
 
-    // タブ切り替え
-    function switchTab(tab) {
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.section').forEach(sec => sec.classList.add('hidden'));
+    // 座席ボタン（A1〜C5など）の描画
+    function renderSeats() {
+      const grid = document.getElementById('seatGrid');
+      grid.innerHTML = '';
+      const seatNames = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5', 'C1', 'C2', 'C3', 'C4', 'C5'];
 
-      if (tab === 'reserve') {
-        document.querySelectorAll('.tab-btn')[0].classList.add('active');
-        document.getElementById('reserveSection').classList.remove('hidden');
-      } else {
-        document.querySelectorAll('.tab-btn')[1].classList.add('active');
-        document.getElementById('cancelSection').classList.remove('hidden');
-      }
-    }
-
-    // GitHubから予約データを取得 (GET)
-    async function fetchDatabase() {
-      const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${FILE_PATH}?t=${Date.now()}`;
-      const res = await fetch(rawUrl);
-      if (!res.ok) throw new Error("データの取得に失敗しました");
-      return await res.json();
-    }
-
-    // 予約済みの座席一覧を取得して反映
-    async function fetchReservedSeats() {
-      try {
-        const data = await fetchDatabase();
-        reservedSeats = data
-          .filter(item => item.status !== 'cancelled')
-          .map(item => item.seat);
-      } catch (err) {
-        console.error("座席データの取得に失敗しました", err);
-      }
-    }
-
-    // シートマップの生成 (10列 × 3行、2人掛けペア5ブロック)
-    function renderSeatMap() {
-      const seatMap = document.getElementById('seatMap');
-      seatMap.innerHTML = '';
-
-      const rows = ['A', 'B', 'C'];
-      rows.forEach(row => {
-        const rowDiv = document.createElement('div');
-        rowDiv.className = 'seat-row';
-
-        for (let col = 1; col <= 10; col++) {
-          const seatId = `${row}-${col}`;
-          const seatBtn = document.createElement('button');
-          seatBtn.type = 'button';
-          seatBtn.className = 'seat-btn';
-          seatBtn.innerText = seatId;
-
-          if (col % 2 === 0 && col !== 10) {
-            seatBtn.classList.add('aisle-right');
-          }
-
-          if (reservedSeats.includes(seatId)) {
-            seatBtn.classList.add('occupied');
-            seatBtn.disabled = true;
-          } else {
-            seatBtn.onclick = () => selectSeat(seatId, seatBtn);
-          }
-
-          rowDiv.appendChild(seatBtn);
-        }
-        seatMap.appendChild(rowDiv);
+      seatNames.forEach(seat => {
+        const div = document.createElement('div');
+        div.className = 'seat';
+        div.id = `seat-${seat}`;
+        div.innerText = seat;
+        div.onclick = () => selectSeat(seat);
+        grid.appendChild(div);
       });
     }
 
-    // 座席選択処理
-    function selectSeat(seatId, btn) {
-      document.querySelectorAll('.seat-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      document.getElementById('selectedSeat').value = seatId;
-      document.getElementById('seatSelectionStatus').innerText = `選択中の座席: ${seatId}`;
-    }
-
-    // 学籍番号のバリデーションチェック (2021〜2026 + 001〜220)
-    function validateStudentId(id) {
-      if (!/^\d{7}$/.test(id)) return false;
-      const year = parseInt(id.substring(0, 4), 10);
-      const num = parseInt(id.substring(4, 7), 10);
-      return (year >= 2021 && year <= 2026) && (num >= 1 && num <= 220);
-    }
-
-    // UTF-8対応 Base64エンコード/デコード
-    function utf8_to_b64(str) {
-      return window.btoa(unescape(encodeURIComponent(str)));
-    }
-    function b64_to_utf8(str) {
-      return decodeURIComponent(escape(window.atob(str)));
-    }
-
-    // GitHub上の data.json を更新する (PUT)
-    async function updateGitHubData(updateCallback, commitMessage) {
-      // 1. 最新のファイル情報 (sha含む) を取得
-      const getRes = await fetch(API_URL, {
-        headers: { "Authorization": `token ${GITHUB_TOKEN}` }
-      });
-      if (!getRes.ok) throw new Error("GitHubからのデータ読み込みに失敗しました");
-      
-      const fileMetaData = await getRes.json();
-      const currentContent = JSON.parse(b64_to_utf8(fileMetaData.content.replace(/\n/g, '')));
-
-      // 2. コールバック処理でデータを更新
-      const updatedContent = updateCallback(currentContent);
-
-      // 3. UTF-8でBase64エンコードして更新リクエストを送信
-      const encodedContent = utf8_to_b64(JSON.stringify(updatedContent, null, 2));
-
-      const putRes = await fetch(API_URL, {
-        method: "PUT",
-        headers: {
-          "Authorization": `token ${GITHUB_TOKEN}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: commitMessage,
-          content: encodedContent,
-          sha: fileMetaData.sha,
-          branch: GITHUB_BRANCH
-        })
-      });
-
-      if (!putRes.ok) throw new Error("GitHubへのデータ保存に失敗しました");
-      return await putRes.json();
-    }
-
-    // 予約実行処理
-    async function handleReserve(e) {
-      e.preventDefault();
-      
-      const studentId = document.getElementById('studentId').value;
-      const seat = document.getElementById('selectedSeat').value;
-
-      if (!validateStudentId(studentId)) {
-        alert("学籍番号が正しくありません。\n入学年度(2021〜2026) + 通し番号(001〜220)の7桁で入力してください。");
+    // 座席の選択処理
+    function selectSeat(seat) {
+      const isReserved = reservedData.some(item => item.seat === seat && item.status !== 'cancelled');
+      if (isReserved) {
+        alert("この座席は既に予約されています。");
         return;
       }
 
-      if (!seat) {
+      document.querySelectorAll('.seat').forEach(el => el.classList.remove('selected'));
+      const target = document.getElementById(`seat-${seat}`);
+      if (target) target.classList.add('selected');
+
+      currentSelectedSeat = seat;
+      document.getElementById('selectedSeat').value = seat;
+    }
+
+    // GitHubからの予約データ読み込み
+    async function loadReservations() {
+      try {
+        const response = await fetch(`${API_URL}?ref=${GITHUB_BRANCH}&t=${Date.now()}`, {
+          headers: {
+            "Authorization": `token ${GITHUB_TOKEN}`,
+            "Accept": "application/vnd.github.v3.raw"
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        reservedData = await response.json();
+
+        // 予約済み座席の見た目を更新
+        reservedData.forEach(item => {
+          if (item.status !== 'cancelled') {
+            const seatEl = document.getElementById(`seat-${item.seat}`);
+            if (seatEl) {
+              seatEl.classList.add('reserved');
+              seatEl.innerText = `${item.seat}\n(予約済)`;
+            }
+          }
+        });
+
+      } catch (error) {
+        console.error("読み込みエラー:", error);
+        alert("GitHubからのデータ読み込みに失敗しました。トークンやファイル設定を確認してください。");
+      }
+    }
+
+    // 予約実行（GitHubへのデータ保存）
+    async function submitReservation() {
+      if (!currentSelectedSeat) {
         alert("座席を選択してください。");
+        return;
+      }
+
+      const lastName = document.getElementById('lastName').value.trim();
+      const firstName = document.getElementById('firstName').value.trim();
+      const lastKana = document.getElementById('lastKana').value.trim();
+      const firstKana = document.getElementById('firstKana').value.trim();
+      const gradeClass = document.getElementById('gradeClass').value.trim();
+      const studentId = document.getElementById('studentId').value.trim();
+      const birthdate = document.getElementById('birthdate').value;
+
+      if (!lastName || !firstName || !lastKana || !firstKana || !gradeClass || !studentId || !birthdate) {
+        alert("全ての項目を入力してください。");
         return;
       }
 
@@ -334,103 +180,68 @@
       submitBtn.disabled = true;
       submitBtn.innerText = "予約処理中...";
 
-      const reservationId = "RES-" + Date.now();
-      const payload = {
-        reservationId: reservationId,
-        lastName: document.getElementById('lastName').value,
-        firstName: document.getElementById('firstName').value,
-        lastKana: document.getElementById('lastKana').value,
-        firstKana: document.getElementById('firstKana').value,
-        grade: document.getElementById('grade').value,
-        className: document.getElementById('className').value,
-        studentId: studentId,
-        birthdate: document.getElementById('birthdate').value,
-        seat: seat,
-        status: "reserved",
-        createdAt: new Date().toISOString()
-      };
-
       try {
-        await updateGitHubData((db) => {
-          // 重複チェック
-          const isAlreadyTaken = db.some(item => item.seat === seat && item.status !== 'cancelled');
-          if (isAlreadyTaken) throw new Error("指定された座席は既に予約されています。");
-          db.push(payload);
-          return db;
-        }, `予約追加: ${seat} (${studentId})`);
-
-        showTicket(reservationId, payload);
-      } catch (err) {
-        alert("エラー: " + err.message);
-        submitBtn.disabled = false;
-        submitBtn.innerText = "予約内容を確認して確定";
-      }
-    }
-
-    // 入場券（QRコード）表示
-    function showTicket(resId, data) {
-      document.getElementById('reserveSection').classList.add('hidden');
-      document.querySelector('.tab-menu').classList.add('hidden');
-      document.getElementById('ticketSection').classList.remove('hidden');
-
-      document.getElementById('ticketResId').innerText = resId;
-      document.getElementById('ticketName').innerText = `${data.lastName} ${data.firstName}`;
-      document.getElementById('ticketClass').innerText = `${data.grade}年 ${data.className}組 (${data.studentId})`;
-      document.getElementById('ticketSeat').innerText = data.seat;
-
-      // QRコードの生成
-      document.getElementById('qrcode').innerHTML = '';
-      new QRCode(document.getElementById('qrcode'), {
-        text: resId,
-        width: 180,
-        height: 180
-      });
-    }
-
-    // キャンセル実行処理
-    async function handleCancel(e) {
-      e.preventDefault();
-      
-      const lastKana = document.getElementById('cancelLastKana').value;
-      const firstKana = document.getElementById('cancelFirstKana').value;
-      const studentId = document.getElementById('cancelStudentId').value;
-      const birthdate = document.getElementById('cancelBirthdate').value;
-
-      if (!confirm("入力された内容で予約をキャンセルします。よろしいですか？")) return;
-
-      const cancelBtn = document.getElementById('cancelBtn');
-      cancelBtn.disabled = true;
-
-      try {
-        let found = false;
-        await updateGitHubData((db) => {
-          const target = db.find(item => 
-            item.lastKana === lastKana &&
-            item.firstKana === firstKana &&
-            item.studentId === studentId &&
-            item.birthdate === birthdate &&
-            item.status !== 'cancelled'
-          );
-
-          if (!target) {
-            throw new Error("該当する予約情報が見つかりませんでした。入力内容をご確認ください。");
+        // 最新のメタデータ（SHA）を取得
+        const getRes = await fetch(API_URL, {
+          headers: {
+            "Authorization": `token ${GITHUB_TOKEN}`,
+            "Accept": "application/vnd.github.v3+json"
           }
+        });
+        const fileMetaData = await getRes.json();
 
-          target.status = 'cancelled';
-          target.cancelledAt = new Date().toISOString();
-          found = true;
-          return db;
-        }, `予約キャンセル: ${studentId}`);
+        // 新しい予約オブジェクト
+        const newReservation = {
+          reservationId: "RES" + Date.now(),
+          seat: currentSelectedSeat,
+          lastName,
+          firstName,
+          lastKana,
+          firstKana,
+          grade: gradeClass,
+          studentId,
+          birthdate,
+          status: "reserved",
+          createdAt: new Date().toISOString()
+        };
 
-        if (found) {
-          alert("予約のキャンセルが完了しました。");
-          location.reload();
+        // 既存のデータに追加
+        reservedData.push(newReservation);
+
+        // UTF-8文字列をBase64エンコード
+        const jsonString = JSON.stringify(reservedData, null, 2);
+        const encodedContent = window.btoa(unescape(encodeURIComponent(jsonString)));
+
+        // GitHub APIで更新（PUT）
+        const putRes = await fetch(API_URL, {
+          method: "PUT",
+          headers: {
+            "Authorization": `token ${GITHUB_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: `新規予約: ${currentSelectedSeat} (${lastName} ${firstName})`,
+            content: encodedContent,
+            sha: fileMetaData.sha,
+            branch: GITHUB_BRANCH
+          })
+        });
+
+        if (!putRes.ok) {
+          throw new Error("更新に失敗しました");
         }
-      } catch (err) {
-        alert("エラー: " + err.message);
-        cancelBtn.disabled = false;
+
+        alert(`予約が完了しました！\n座席: ${currentSelectedSeat}`);
+        location.reload();
+
+      } catch (error) {
+        console.error("予約エラー:", error);
+        alert("予約の保存に失敗しました。再度お試しください。");
+        submitBtn.disabled = false;
+        submitBtn.innerText = "予約を確定する";
       }
     }
   </script>
+
 </body>
 </html>
