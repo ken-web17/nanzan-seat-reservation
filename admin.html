@@ -3,234 +3,135 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>【運営用】南山生 座席予約管理システム</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- QRコード読み取り用ライブラリ (Html5-QRCode) -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <title>座席予約 管理者ページ</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f6f9; }
+    .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    h1 { color: #333; }
+    .refresh-btn { padding: 8px 16px; background: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 15px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+    th { background: #f8f9fa; }
+    .status-reserved { color: green; font-weight: bold; }
+    .status-cancelled { color: red; font-weight: bold; }
+    .cancel-btn { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+  </style>
 </head>
-<body class="admin-body">
-  <div class="admin-container">
-    <header class="admin-header">
-      <h1>講演会 運営用管理ダッシュボード</h1>
-      <button onclick="loadData()" class="refresh-btn">🔄 最新データを再読み込み</button>
-    </header>
-
-    <!-- メイングリッド (左: QRスキャナー & シートマップ / 右: 予約管理リスト) -->
-    <div class="admin-grid">
-      
-      <!-- 左カラム: カメラ受付 & シートマップ -->
-      <div class="admin-col">
-        <!-- 1. QRスキャナー -->
-        <div class="admin-card">
-          <h2>QRコード受付スキャン</h2>
-          <div id="reader" style="width: 100%;"></div>
-          <div id="scanResult" class="scan-result-box hidden"></div>
-        </div>
-
-        <!-- 2. シートマップ状況 -->
-        <div class="admin-card">
-          <h2>リアルタイム座席状況</h2>
-          <div class="legend">
-            <span class="legend-item"><span class="box free"></span> 空席</span>
-            <span class="legend-item"><span class="box reserved"></span> 予約済</span>
-            <span class="legend-item"><span class="box checked"></span> 受付済</span>
-          </div>
-          <div id="adminSeatMap" class="seat-map admin-map"></div>
-        </div>
-      </div>
-
-      <!-- 右カラム: 予約一覧テーブル & 手動操作 -->
-      <div class="admin-col">
-        <div class="admin-card">
-          <div class="card-header">
-            <h2>予約データ一覧 (<span id="totalCount">0</span>件)</h2>
-            <input type="text" id="searchInput" oninput="filterTable()" placeholder="名前・学籍番号・座席で検索..." class="search-box">
-          </div>
-
-          <div class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>予約番号</th>
-                  <th>氏名 (ふりがな)</th>
-                  <th>所属</th>
-                  <th>学籍番号</th>
-                  <th>座席</th>
-                  <th>状態</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="reservationTableBody">
-                <tr><td colspan="7" style="text-align:center;">データを読み込み中...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-    </div>
+<body>
+  <div class="container">
+    <h1>座席予約 管理者モニタリング</h1>
+    <button class="refresh-btn" onclick="loadData()">最新データに更新</button>
+    
+    <table>
+      <thead>
+        <tr>
+          <th>予約ID</th>
+          <th>座席</th>
+          <th>氏名</th>
+          <th>学年・クラス</th>
+          <th>学籍番号</th>
+          <th>生年月日</th>
+          <th>ステータス</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="reservationTable">
+        <tr><td colspan="8">データを読み込み中...</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <script>
-    // ★ご自身のGAS WebアプリURLに差し替えてください★
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxpf73U1yPf3frEY7E6NXVJoDPqou0GVhUC2YU19fDC8Wve9jB2jFfyh3D_2MBSt5PsnA/exec";
+    const GITHUB_OWNER = "ken-web17";
+    const GITHUB_REPO = "nanzan-seat-reservation";
+    const GITHUB_BRANCH = "main";
+    const FILE_PATH = "data.json";
+    
+    // ⚠️ ここに「再発行した新しいPAT」を貼り付けてください
+    const GITHUB_TOKEN = "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";
 
-    let allReservations = [];
-    let html5QrcodeScanner;
+    const API_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`;
 
-    window.onload = () => {
-      loadData();
-      initScanner();
-    };
-
-    // データの読み込み
     async function loadData() {
-      try {
-        const res = await fetch(GAS_API_URL);
-        allReservations = await res.json();
-        renderTable(allReservations);
-        renderAdminSeatMap();
-      } catch (err) {
-        alert("データの取得に失敗しました。");
-      }
-    }
-
-    // テーブル描画
-    function renderTable(data) {
-      const tbody = document.getElementById('reservationTableBody');
-      tbody.innerHTML = '';
-
-      const activeData = data.filter(r => r['ステータス'] !== 'キャンセル');
-      document.getElementById('totalCount').innerText = activeData.length;
-
-      data.forEach(item => {
-        const tr = document.createElement('tr');
-        if (item['ステータス'] === 'キャンセル') tr.className = 'status-cancelled-row';
-
-        let statusClass = 'badge-reserved';
-        if (item['ステータス'] === '受付済') statusClass = 'badge-checked';
-        if (item['ステータス'] === 'キャンセル') statusClass = 'badge-cancelled';
-
-        tr.innerHTML = `
-          <td><strong>${item['予約番号']}</strong></td>
-          <td>${item['姓']} ${item['名']}<br><small>(${item['セイ']} ${item['メイ']})</small></td>
-          <td>${item['学年']}-${item['クラス']}</td>
-          <td>${item['学籍番号']}</td>
-          <td><strong class="seat-tag">${item['座席番号']}</strong></td>
-          <td><span class="badge ${statusClass}">${item['ステータス']}</span></td>
-          <td>
-            ${item['ステータス'] === '予約済' ? `<button onclick="updateStatus('${item['予約番号']}', '受付済')" class="btn-sm btn-check">手動受付</button>` : ''}
-            ${item['ステータス'] !== 'キャンセル' ? `<button onclick="updateStatus('${item['予約番号']}', 'キャンセル')" class="btn-sm btn-cancel">キャンセル</button>` : ''}
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    // 検索フィルター
-    function filterTable() {
-      const query = document.getElementById('searchInput').value.toLowerCase();
-      const filtered = allReservations.filter(r => {
-        return (r['姓'] + r['名']).toLowerCase().includes(query) ||
-               (r['セイ'] + r['メイ']).toLowerCase().includes(query) ||
-               String(r['学籍番号']).includes(query) ||
-               String(r['座席番号']).toLowerCase().includes(query) ||
-               String(r['予約番号']).toLowerCase().includes(query);
-      });
-      renderTable(filtered);
-    }
-
-    // 管理者シートマップ描画
-    function renderAdminSeatMap() {
-      const seatMap = document.getElementById('adminSeatMap');
-      seatMap.innerHTML = '';
-
-      const seatStatusMap = {};
-      allReservations.forEach(r => {
-        if (r['ステータス'] !== 'キャンセル') {
-          seatStatusMap[r['座席番号']] = r['ステータス'];
-        }
-      });
-
-      const rows = ['A', 'B', 'C'];
-      rows.forEach(row => {
-        const rowDiv = document.createElement('div');
-        rowDiv.className = 'seat-row';
-
-        for (let col = 1; col <= 10; col++) {
-          const seatId = `${row}-${col}`;
-          const seatBox = document.createElement('div');
-          seatBox.className = 'admin-seat-box';
-          seatBox.innerText = seatId;
-
-          if (col % 2 === 0 && col !== 10) seatBox.classList.add('aisle-right');
-
-          const status = seatStatusMap[seatId];
-          if (status === '予約済') seatBox.classList.add('reserved');
-          else if (status === '受付済') seatBox.classList.add('checked');
-          else seatBox.classList.add('free');
-
-          rowDiv.appendChild(seatBox);
-        }
-        seatMap.appendChild(rowDiv);
-      });
-    }
-
-    // スキャン処理
-    function initScanner() {
-      html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-      html5QrcodeScanner.render(onScanSuccess);
-    }
-
-    async function onScanSuccess(decodedText) {
-      const resultBox = document.getElementById('scanResult');
-      resultBox.classList.remove('hidden', 'success', 'error');
-      resultBox.innerText = "照合中...";
+      const tbody = document.getElementById('reservationTable');
+      tbody.innerHTML = '<tr><td colspan="8">データを読み込み中...</td></tr>';
 
       try {
-        const res = await fetch(GAS_API_URL, {
-          method: "POST",
-          body: JSON.stringify({ action: "checkIn", reservationId: decodedText })
-        });
-        const result = await res.json();
+        const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${FILE_PATH}?t=${Date.now()}`;
+        const res = await fetch(rawUrl);
+        const data = await res.json();
 
-        if (result.success) {
-          resultBox.classList.add('success');
-          const data = result.data;
-          resultBox.innerHTML = `
-            <h3>⭕ 受付完了！</h3>
-            <p><strong>${data[1]} ${data[2]} 様</strong> (${data[5]}-${data[6]} / 座席: ${data[9]})</p>
+        tbody.innerHTML = '';
+        if (data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8">予約データはありません。</td></tr>';
+          return;
+        }
+
+        data.forEach(item => {
+          const tr = document.createElement('tr');
+          const isCancelled = item.status === 'cancelled';
+          
+          tr.innerHTML = `
+            <td>${item.reservationId}</td>
+            <td><strong>${item.seat}</strong></td>
+            <td>${item.lastName} ${item.firstName} (${item.lastKana} ${item.firstKana})</td>
+            <td>${item.grade} ${item.className}</td>
+            <td>${item.studentId}</td>
+            <td>${item.birthdate}</td>
+            <td class="${isCancelled ? 'status-cancelled' : 'status-reserved'}">
+              ${isCancelled ? 'キャンセル済' : '予約中'}
+            </td>
+            <td>
+              ${!isCancelled ? `<button class="cancel-btn" onclick="forceCancel('${item.reservationId}')">強制キャンセル</button>` : '-'}
+            </td>
           `;
-          loadData(); // 画面更新
-        } else {
-          resultBox.classList.add('error');
-          resultBox.innerHTML = `<h3>❌ エラー</h3><p>${result.message}</p>`;
-        }
+          tbody.appendChild(tr);
+        });
       } catch (err) {
-        resultBox.classList.add('error');
-        resultBox.innerText = "通信エラーが発生しました。";
+        tbody.innerHTML = '<tr><td colspan="8">データの取得に失敗しました。PATの設定などを確認してください。</td></tr>';
       }
     }
 
-    // ステータス手動変更
-    async function updateStatus(resId, newStatus) {
-      if (!confirm(`予約番号 ${resId} を「${newStatus}」に変更しますか？`)) return;
+    async function forceCancel(resId) {
+      if (!confirm("この予約を管理者権限で強制キャンセルしますか？")) return;
 
       try {
-        const res = await fetch(GAS_API_URL, {
-          method: "POST",
-          body: JSON.stringify({ action: "adminUpdate", reservationId: resId, status: newStatus })
+        const getRes = await fetch(API_URL, {
+          headers: { "Authorization": `token ${GITHUB_TOKEN}` }
         });
-        const result = await res.json();
-        if (result.success) {
-          loadData();
-        } else {
-          alert("エラー: " + result.message);
+        const fileMetaData = await getRes.json();
+        const currentContent = JSON.parse(decodeURIComponent(escape(window.atob(fileMetaData.content.replace(/\n/g, '')))));
+
+        const target = currentContent.find(item => item.reservationId === resId);
+        if (target) {
+          target.status = 'cancelled';
+          target.cancelledAt = new Date().toISOString();
         }
+
+        const encodedContent = window.btoa(unescape(encodeURIComponent(JSON.stringify(currentContent, null, 2))));
+
+        await fetch(API_URL, {
+          method: "PUT",
+          headers: {
+            "Authorization": `token ${GITHUB_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: `管理者による強制キャンセル: ${resId}`,
+            content: encodedContent,
+            sha: fileMetaData.sha,
+            branch: GITHUB_BRANCH
+          })
+        });
+
+        alert("キャンセル処理が完了しました。");
+        loadData();
       } catch (err) {
-        alert("通信エラーが発生しました。");
+        alert("キャンセルの処理に失敗しました。");
       }
     }
+
+    window.onload = loadData;
   </script>
 </body>
 </html>
