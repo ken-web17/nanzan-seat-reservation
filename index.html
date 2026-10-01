@@ -9,20 +9,22 @@
     .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     h1 { text-align: center; color: #333; }
     .seat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; }
-    .seat { padding: 15px; border: 1px solid #ccc; text-align: center; border-radius: 5px; cursor: pointer; background-color: #e9ecef; }
+    .seat { padding: 15px; border: 1px solid #ccc; text-align: center; border-radius: 5px; cursor: pointer; background-color: #e9ecef; font-weight: bold; }
     .seat.selected { background-color: #0d6efd; color: white; }
     .seat.reserved { background-color: #dc3545; color: white; cursor: not-allowed; }
     .form-group { margin-bottom: 15px; }
     label { display: block; margin-bottom: 5px; font-weight: bold; }
     input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-    button { width: 100%; padding: 10px; background-color: #198754; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+    button { width: 100%; padding: 12px; background-color: #198754; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
     button:disabled { background-color: #6c757d; cursor: not-allowed; }
+    .loading-msg { text-align: center; color: #666; font-size: 14px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
 
   <div class="container">
     <h1>座席予約システム</h1>
+    <div id="statusMsg" class="loading-msg">データを読み込み中...</div>
     
     <h3>1. 座席を選択してください</h3>
     <div class="seat-grid" id="seatGrid">
@@ -77,21 +79,21 @@
     const GITHUB_BRANCH = "main";
     const FILE_PATH = "data.json";
 
-    // ⚠️ 発行した Personal Access Token (ghp_...) をここに貼り付けてください
-    const GITHUB_TOKEN = "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";
+    // ⚠️ 新しく発行した Personal Access Token (ghp_...) をここに貼り付けてください
+    const GITHUB_TOKEN = "ここに再発行したPATを貼り付け";
 
     const API_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`;
 
     let reservedData = [];
     let currentSelectedSeat = null;
 
-    // 初期化：座席一覧の生成とデータ読み込み
+    // ページ読み込み時の初期化
     window.onload = async () => {
       renderSeats();
       await loadReservations();
     };
 
-    // 座席ボタン（A1〜C5など）の描画
+    // 座席グリッド（A1〜C5）を描画
     function renderSeats() {
       const grid = document.getElementById('seatGrid');
       grid.innerHTML = '';
@@ -107,7 +109,7 @@
       });
     }
 
-    // 座席の選択処理
+    // 座席クリック時の選択処理
     function selectSeat(seat) {
       const isReserved = reservedData.some(item => item.seat === seat && item.status !== 'cancelled');
       if (isReserved) {
@@ -123,8 +125,9 @@
       document.getElementById('selectedSeat').value = seat;
     }
 
-    // GitHubからの予約データ読み込み
+    // GitHubからの予約データ読み込み（認証ヘッダー付き）
     async function loadReservations() {
+      const statusMsg = document.getElementById('statusMsg');
       try {
         const response = await fetch(`${API_URL}?ref=${GITHUB_BRANCH}&t=${Date.now()}`, {
           headers: {
@@ -134,12 +137,14 @@
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`HTTP Error: ${response.status}`);
         }
 
         reservedData = await response.json();
+        statusMsg.innerText = "最新データを取得しました。";
+        statusMsg.style.color = "green";
 
-        // 予約済み座席の見た目を更新
+        // 予約済みの座席を更新
         reservedData.forEach(item => {
           if (item.status !== 'cancelled') {
             const seatEl = document.getElementById(`seat-${item.seat}`);
@@ -151,12 +156,13 @@
         });
 
       } catch (error) {
-        console.error("読み込みエラー:", error);
-        alert("GitHubからのデータ読み込みに失敗しました。トークンやファイル設定を確認してください。");
+        console.error("データ取得エラー:", error);
+        statusMsg.innerText = "GitHubからのデータ読み込みに失敗しました。PAT（トークン）が設定されているか確認してください。";
+        statusMsg.style.color = "red";
       }
     }
 
-    // 予約実行（GitHubへのデータ保存）
+    // 予約の送信処理
     async function submitReservation() {
       if (!currentSelectedSeat) {
         alert("座席を選択してください。");
@@ -172,25 +178,30 @@
       const birthdate = document.getElementById('birthdate').value;
 
       if (!lastName || !firstName || !lastKana || !firstKana || !gradeClass || !studentId || !birthdate) {
-        alert("全ての項目を入力してください。");
+        alert("すべての項目を入力してください。");
         return;
       }
 
       const submitBtn = document.getElementById('submitBtn');
       submitBtn.disabled = true;
-      submitBtn.innerText = "予約処理中...";
+      submitBtn.innerText = "予約を送信中...";
 
       try {
-        // 最新のメタデータ（SHA）を取得
+        // 更新用メタデータ（SHA）の取得
         const getRes = await fetch(API_URL, {
           headers: {
             "Authorization": `token ${GITHUB_TOKEN}`,
             "Accept": "application/vnd.github.v3+json"
           }
         });
+
+        if (!getRes.ok) {
+          throw new Error("GitHubメタデータの取得に失敗しました。");
+        }
+
         const fileMetaData = await getRes.json();
 
-        // 新しい予約オブジェクト
+        // 新規予約オブジェクト
         const newReservation = {
           reservationId: "RES" + Date.now(),
           seat: currentSelectedSeat,
@@ -205,14 +216,13 @@
           createdAt: new Date().toISOString()
         };
 
-        // 既存のデータに追加
         reservedData.push(newReservation);
 
-        // UTF-8文字列をBase64エンコード
+        // UTF-8対応Base64エンコード
         const jsonString = JSON.stringify(reservedData, null, 2);
         const encodedContent = window.btoa(unescape(encodeURIComponent(jsonString)));
 
-        // GitHub APIで更新（PUT）
+        // GitHub APIで保存
         const putRes = await fetch(API_URL, {
           method: "PUT",
           headers: {
@@ -228,7 +238,7 @@
         });
 
         if (!putRes.ok) {
-          throw new Error("更新に失敗しました");
+          throw new Error("予約の保存に失敗しました。");
         }
 
         alert(`予約が完了しました！\n座席: ${currentSelectedSeat}`);
@@ -236,7 +246,7 @@
 
       } catch (error) {
         console.error("予約エラー:", error);
-        alert("予約の保存に失敗しました。再度お試しください。");
+        alert("予約の保存に失敗しました: " + error.message);
         submitBtn.disabled = false;
         submitBtn.innerText = "予約を確定する";
       }
